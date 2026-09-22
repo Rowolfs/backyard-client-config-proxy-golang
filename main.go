@@ -4,8 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/joho/godotenv"
-
 	"backyard-client-config-proxy-golang/config"
 	"backyard-client-config-proxy-golang/internal/proxy"
 	"backyard-client-config-proxy-golang/internal/remnawave"
@@ -13,13 +11,6 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf(
-			".env not loaded: %v",
-			err,
-		)
-	}
-
 	token := config.RemnawaveAPIToken()
 	baseURL := config.RemnawaveAPIBaseURL()
 	if token == "" || baseURL == "" {
