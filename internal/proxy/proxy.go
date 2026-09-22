@@ -11,7 +11,11 @@ import (
 	"backyard-client-config-proxy-golang/internal/transform"
 )
 
-func New(upstreamURL string) (*httputil.ReverseProxy, error) {
+func New(
+	upstreamURL string,
+	transformer *transform.Transformer,
+) (*httputil.ReverseProxy, error) {
+
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {
 		return nil, err
@@ -48,7 +52,10 @@ func New(upstreamURL string) (*httputil.ReverseProxy, error) {
 			len(body),
 		)
 
-		newBody, err := transform.Transform(body)
+		newBody, err := transformer.Transform(
+			resp.Request.Context(),
+			body,
+		)
 		if err != nil {
 			return err
 		}
@@ -63,6 +70,20 @@ func New(upstreamURL string) (*httputil.ReverseProxy, error) {
 		resp.Header.Del("ETag")
 
 		return nil
+	}
+
+	p.ErrorHandler = func(
+		w http.ResponseWriter,
+		req *http.Request,
+		err error,
+	) {
+		log.Printf("proxy error: %v", err)
+
+		http.Error(
+			w,
+			"Bad Gateway",
+			http.StatusBadGateway,
+		)
 	}
 
 	return p, nil
