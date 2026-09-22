@@ -1,0 +1,19 @@
+services:
+  backyard-client-config-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: backyard-client-config-proxy
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      - "127.0.0.1:8080:8080"

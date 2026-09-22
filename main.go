@@ -21,7 +21,7 @@ func main() {
 	}
 
 	token := config.RemnawaveAPIToken()
-	baseURL := config.RemnawaveAPIBaseUrl()
+	baseURL := config.RemnawaveAPIBaseURL()
 	if token == "" || baseURL == "" {
 		log.Fatal(
 			"REMNAWAVE_API_TOKEN or REMNAWAVE_API_BASE_URL is empty",
@@ -44,7 +44,7 @@ func main() {
 	)
 
 	p, err := proxy.New(
-		config.UpstreamURL,
+		config.UpstreamURL(),
 		transformer,
 	)
 	if err != nil {
@@ -53,12 +53,12 @@ func main() {
 
 	log.Printf(
 		"Starting reverse proxy on %s -> %s",
-		config.ListenAddress,
-		config.UpstreamURL,
+		config.ListenAddress(),
+		config.UpstreamURL(),
 	)
 
 	if err := http.ListenAndServe(
-		config.ListenAddress,
+		config.ListenAddress(),
 		p,
 	); err != nil {
 		log.Fatal(err)
