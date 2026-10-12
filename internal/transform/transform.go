@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"strings"
 
 	"backyard-client-config-proxy-golang/internal/remnawave"
 )

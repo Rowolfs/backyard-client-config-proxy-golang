@@ -20,9 +20,9 @@ func main() {
 	}
 
 	log.Printf(
-	"Remnawave API configured: %s, token loaded=%t",
-	baseURL,
-	token != "",
+		"Remnawave API configured: %s, token loaded=%t",
+		baseURL,
+		token != "",
 	)
 
 	remnawaveClient := remnawave.NewClient(

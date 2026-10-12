@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"backyard-client-config-proxy-golang/internal/config"
+	"backyard-client-config-proxy-golang/config"
 	"backyard-client-config-proxy-golang/internal/transform"
 )
 
