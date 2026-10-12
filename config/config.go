@@ -31,3 +31,7 @@ func RemnawaveAPIToken() string {
 func RemnawaveAPIBaseURL() string {
 	return os.Getenv("REMNAWAVE_API_BASE_URL")
 }
+
+func RemnawaveSecretSubsPath() string {
+	return os.Getenv("REMNAWAVE_SECRET_SUBS_PATH")
+}

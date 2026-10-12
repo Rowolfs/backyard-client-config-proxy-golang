@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
-	"log"
 )
 
 type Client struct {
@@ -18,14 +19,26 @@ type Client struct {
 }
 
 type Host struct {
-	UUID   string          `json:"uuid"`
-	Remark string          `json:"remark"`
-	Address string         `json:"address"`
-	Port    int            `json:"port"`
+	UUID    string `json:"uuid"`
+	Remark  string `json:"remark"`
+	Address string `json:"address"`
+	Port    int    `json:"port"`
 
 	// Поддерживаем оба варианта API.
 	Tag  *string         `json:"tag"`
 	Tags json.RawMessage `json:"tags"`
+}
+
+type InternalSquad struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+type User struct {
+	UUID                 string          `json:"uuid"`
+	ShortUUID            string          `json:"shortUuid"`
+	Username             string          `json:"username"`
+	ActiveInternalSquads []InternalSquad `json:"activeInternalSquads"`
 }
 
 func NewClient(baseURL, token string) *Client {
@@ -61,8 +74,8 @@ func (c *Client) GetHosts(ctx context.Context) ([]Host, error) {
 	)
 
 	log.Printf(
-	"[remnawave] GET %s/api/hosts",
-	c.baseURL,
+		"[remnawave] GET %s/api/hosts",
+		c.baseURL,
 	)
 
 	resp, err := c.httpClient.Do(req)
@@ -72,9 +85,9 @@ func (c *Client) GetHosts(ctx context.Context) ([]Host, error) {
 	defer resp.Body.Close()
 
 	log.Printf(
-	"[remnawave] response status=%s",
-	resp.Status,
-)
+		"[remnawave] response status=%s",
+		resp.Status,
+	)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(
@@ -96,23 +109,11 @@ func (c *Client) GetHosts(ctx context.Context) ([]Host, error) {
 		return nil, err
 	}
 
-	// Вариант:
-	// {
-	//   "response": [...]
-	// }
-
 	var hosts []Host
 
 	if err := json.Unmarshal(envelope.Response, &hosts); err == nil {
 		return hosts, nil
 	}
-
-	// Вариант:
-	// {
-	//   "response": {
-	//     "hosts": [...]
-	//   }
-	// }
 
 	var wrapped struct {
 		Hosts []Host `json:"hosts"`
@@ -129,6 +130,103 @@ func (c *Client) GetHosts(ctx context.Context) ([]Host, error) {
 	}
 
 	return wrapped.Hosts, nil
+}
+
+func (c *Client) GetUserByShortUUID(
+	ctx context.Context,
+	shortUUID string,
+) (*User, error) {
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/api/users/by-short-uuid/"+url.PathEscape(shortUUID),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set(
+		"Authorization",
+		"Bearer "+c.token,
+	)
+
+	req.Header.Set(
+		"Accept",
+		"application/json",
+	)
+
+	log.Printf(
+		"[remnawave] GET user by shortUuid=%s",
+		shortUUID,
+	)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	log.Printf(
+		"[remnawave] user response status=%s",
+		resp.Status,
+	)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(
+			io.LimitReader(resp.Body, 4096),
+		)
+
+		return nil, fmt.Errorf(
+			"Remnawave API returned %s: %s",
+			resp.Status,
+			string(body),
+		)
+	}
+
+	var envelope struct {
+		Response json.RawMessage `json:"response"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, err
+	}
+
+	var user User
+
+	if err := json.Unmarshal(envelope.Response, &user); err == nil && user.UUID != "" {
+		return &user, nil
+	}
+
+	// На случай если API оборачивает пользователя:
+	// {
+	//   "response": {
+	//     "user": {...}
+	//   }
+	// }
+	var wrapped struct {
+		User User `json:"user"`
+	}
+
+	if err := json.Unmarshal(
+		envelope.Response,
+		&wrapped,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"unexpected Remnawave user response: %w",
+			err,
+		)
+	}
+
+	if wrapped.User.UUID == "" {
+		return nil, fmt.Errorf(
+			"user with shortUuid %q not found in response",
+			shortUUID,
+		)
+	}
+
+	return &wrapped.User, nil
 }
 
 func FindHostByRemark(
@@ -223,6 +321,36 @@ func (h Host) TagNames() []string {
 				add(tag.Value)
 			}
 		}
+	}
+
+	return result
+}
+
+func (u User) HasInternalSquad(name string) bool {
+	for _, squad := range u.ActiveInternalSquads {
+		if strings.EqualFold(
+			strings.TrimSpace(squad.Name),
+			strings.TrimSpace(name),
+		) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (u User) InternalSquadNames() []string {
+	result := make([]string, 0, len(u.ActiveInternalSquads))
+
+	for _, squad := range u.ActiveInternalSquads {
+		if squad.Name == "" {
+			continue
+		}
+
+		result = append(
+			result,
+			squad.Name,
+		)
 	}
 
 	return result

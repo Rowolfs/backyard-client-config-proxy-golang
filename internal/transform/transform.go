@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 
 	"backyard-client-config-proxy-golang/internal/remnawave"
 )
@@ -22,10 +23,15 @@ func New(
 
 func (t *Transformer) Transform(
 	ctx context.Context,
+	subscriptionID string,
 	body []byte,
 ) ([]byte, error) {
 
-	log.Printf("[transform] called, body=%d bytes", len(body))
+	log.Printf(
+		"[transform] called subscriptionID=%s body=%d bytes",
+		subscriptionID,
+		len(body),
+	)
 
 	var configs []map[string]any
 
@@ -35,6 +41,48 @@ func (t *Transformer) Transform(
 	}
 
 	log.Printf("[transform] parsed %d Xray configs", len(configs))
+
+	// ============================================================
+	// Admin Internal Squad
+	// ============================================================
+
+	if subscriptionID != "" {
+		user, err := t.remnawave.GetUserByShortUUID(
+			ctx,
+			subscriptionID,
+		)
+
+		if err != nil {
+			// Fail-safe:
+			// если не смогли определить пользователя,
+			// НЕ выдаём все конфиги, а продолжаем обычную фильтрацию.
+			log.Printf(
+				"[transform] failed to get user shortUuid=%q: %v",
+				subscriptionID,
+				err,
+			)
+		} else {
+			log.Printf(
+				"[transform] user=%q squads=%v",
+				user.Username,
+				user.InternalSquadNames(),
+			)
+
+			if user.HasInternalSquad("ADMINS") {
+				log.Printf(
+					"[transform] user=%q is in admins squad, returning all %d configs",
+					user.Username,
+					len(configs),
+				)
+
+				return body, nil
+			}
+		}
+	}
+
+	// ============================================================
+	// Default filtering
+	// ============================================================
 
 	log.Printf("[transform] requesting hosts from Remnawave API")
 
@@ -97,9 +145,7 @@ func (t *Transformer) Transform(
 	}
 
 	return newBody, nil
-
 }
-
 
 func HasTag(
 	tags []string,

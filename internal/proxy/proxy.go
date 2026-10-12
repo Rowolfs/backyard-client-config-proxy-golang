@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
+	"backyard-client-config-proxy-golang/internal/config"
 	"backyard-client-config-proxy-golang/internal/transform"
 )
 
@@ -52,8 +54,26 @@ func New(
 			len(body),
 		)
 
+		subscriptionID := extractSubscriptionID(
+			resp.Request.URL.Path,
+			config.RemnawaveSecretSubsPath(),
+		)
+
+		if subscriptionID == "" {
+			log.Printf(
+				"[proxy] subscription id not found in path=%q",
+				resp.Request.URL.Path,
+			)
+		} else {
+			log.Printf(
+				"[proxy] subscription id=%s",
+				subscriptionID,
+			)
+		}
+
 		newBody, err := transformer.Transform(
 			resp.Request.Context(),
+			subscriptionID,
 			body,
 		)
 		if err != nil {
@@ -87,4 +107,29 @@ func New(
 	}
 
 	return p, nil
+}
+
+func extractSubscriptionID(
+	path string,
+	secretPath string,
+) string {
+
+	secretPath = strings.Trim(secretPath, "/")
+	path = strings.Trim(path, "/")
+
+	if secretPath == "" || path == "" {
+		return ""
+	}
+
+	parts := strings.Split(path, "/")
+
+	if len(parts) != 2 {
+		return ""
+	}
+
+	if parts[0] != secretPath {
+		return ""
+	}
+
+	return parts[1]
 }
